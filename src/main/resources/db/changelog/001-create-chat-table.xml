@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="create-chat-table" author="Artash Shaghoyan">
+        <preConditions>
+            <not>
+                <tableExists tableName="chat" schemaName="chat_service"/>
+            </not>
+        </preConditions>
+
+        <createTable tableName="chat" schemaName="chat_service">
+            <column name="id" type="bigserial">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="created_date_time" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_activity" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="true"/>
+            </column>
+            <column name="chat_type" type="VARCHAR(20)">
+                <constraints nullable="true"/>
+            </column>
+            <column name="is_match" type="BOOLEAN">
+                <constraints nullable="true"/>
+            </column>
+            <column name="status" type="VARCHAR(20)">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="chat-table-rollback" author="Artash Shaghoyan">
+        <rollback>
+            <dropTable
+                    tableName="chat"
+                    schemaName="chat_service"
+                    cascadeConstraints="true"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>
