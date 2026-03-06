@@ -24,9 +24,6 @@
             <column name="chat_type" type="VARCHAR(20)">
                 <constraints nullable="true"/>
             </column>
-            <column name="is_match" type="BOOLEAN">
-                <constraints nullable="true"/>
-            </column>
             <column name="status" type="VARCHAR(20)">
                 <constraints nullable="false"/>
             </column>
