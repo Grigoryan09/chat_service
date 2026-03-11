@@ -4,11 +4,11 @@ import java.time.LocalDateTime;
 
 public record ChatMessageDto(
        long id,
-       long chatId,
        long userId,
        String message,
        boolean isRead,
-       LocalDateTime createdDate){
+       LocalDateTime createdDate,
+       LocalDateTime updatedDate){
 }
 
 

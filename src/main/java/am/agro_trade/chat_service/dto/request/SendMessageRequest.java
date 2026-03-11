@@ -5,10 +5,9 @@ import java.time.LocalDateTime;
 
 public record SendMessageRequest(
         long chatId,
-        long userId,
+        long memberId,
         String message,
         LocalDateTime createdDate,
-        LocalDateTime updatedDate,
-        boolean isRead
+        LocalDateTime updatedDate
 ) {
 }

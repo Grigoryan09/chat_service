@@ -2,8 +2,10 @@ package am.agro_trade.chat_service.dto.request;
 
 import am.agro_trade.chat_service.model.enums.ChatType;
 
+import java.util.List;
+
 public record CreateChatRequest(
-        long userId,
+        List<Long> userIds,
         ChatType chatType
 ) {
 }
