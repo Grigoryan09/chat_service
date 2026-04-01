@@ -1,17 +1,18 @@
 package am.chat_service.service.impl;
 
 import am.chat_service.dto.mapper.ChatMessageMapper;
+import am.chat_service.dto.request.ChatMessageRequest;
 import am.chat_service.dto.request.SendMessageRequest;
 import am.chat_service.dto.request.UpdateMessageRequest;
-import am.chat_service.dto.response.ChatMessageDto;
+import am.chat_service.dto.ChatMessageDto;
 import am.chat_service.event.ChatEventPublisher;
-import am.chat_service.exception.ChatMemberNotFoundException;
 import am.chat_service.exception.ChatMessageNotFoundException;
 import am.chat_service.exception.ChatNotFoundException;
 import am.chat_service.exception.InvalidChatRequestException;
 import am.chat_service.model.Chat;
 import am.chat_service.model.ChatMember;
 import am.chat_service.model.ChatMessage;
+import am.chat_service.model.enums.MessageStatus;
 import am.chat_service.repository.ChatMemberRepository;
 import am.chat_service.repository.ChatMessageRepository;
 import am.chat_service.repository.ChatRepository;
@@ -38,103 +39,78 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Override
     @Transactional
-    public ChatMessageDto sendMessage(SendMessageRequest sendMessageRequest) {
-        if (sendMessageRequest == null) {
-            throw new InvalidChatRequestException("SendMessageRequest cannot be null");
-        }
+    public ChatMessageDto sendMessage(SendMessageRequest request) {
 
-        if (sendMessageRequest.getChatId() <= 0) {
-            throw new InvalidChatRequestException("Chat ID must be positive" + sendMessageRequest.getChatId() );
-        }
-
-        if (sendMessageRequest.getMemberId() <= 0) {
-            throw new InvalidChatRequestException("Member ID must be positive" + sendMessageRequest.getMemberId());
-        }
-
-        if (sendMessageRequest.getMessage() == null || sendMessageRequest.getMessage().isEmpty()) {
-            throw new InvalidChatRequestException("Message cannot be empty" + sendMessageRequest.getMessage());
-        }
-
-        Chat chat = chatRepository.findById(sendMessageRequest.getChatId()).orElseThrow(() -> new ChatNotFoundException(sendMessageRequest.getChatId()));
-        ChatMember member = chatMemberRepository.findById(sendMessageRequest.getMemberId()).orElseThrow(
-                () -> new ChatMemberNotFoundException(sendMessageRequest.getMemberId()));
+        Chat chat = chatRepository.findById(request.getChatId()).orElseThrow(() -> new ChatNotFoundException("Chat not found with id: " + request.getChatId()));
+        ChatMember member = chatMemberRepository.findById(request.getMemberId());
         if (!Objects.equals(member.getChat().getId(), chat.getId())) {
             throw new InvalidChatRequestException(
                     "Member " + member.getId() + " does not belong to chat " + chat.getId()
             );
         }
 
-        ChatMessage message = new ChatMessage();
-        message.setChat(chat);
-        message.setMessage(sendMessageRequest.getMessage());
-        message.setChatMember(member);
-        message.setCreatedDate(LocalDateTime.now());
-        message.setUpdatedDate(LocalDateTime.now());
-
-        ChatMessage savedMessage = chatMessageRepository.save(message);
-
         chat.setLastActivity(LocalDateTime.now());
         chatRepository.save(chat);
 
-        ChatMessageDto messageDto = chatMessageMapper.toDto(savedMessage);
+        ChatMessageDto messageDto = chatMessageMapper.toDto(
+                chatMessageRepository.save(createMessage(request, chat, member)));
 
-        chatEventPublisher.publishNewMessage(sendMessageRequest.getChatId(), messageDto);
+        chatEventPublisher.publishNewMessage(request.getChatId(), messageDto);
 
         return messageDto;
     }
 
+    private ChatMessage createMessage(SendMessageRequest request, Chat chat, ChatMember member) {
+        return ChatMessage.builder()
+                .chat(chat)
+                .chatMember(member)
+                .createdDate(LocalDateTime.now())
+                .message(request.getMessage())
+                .status(MessageStatus.SENT)
+                .build();
+    }
+
     @Override
-    public void updateChatMessage(UpdateMessageRequest updateMessageReadRequest) {
-        if (updateMessageReadRequest == null) {
-            throw new InvalidChatRequestException("UpdateMessageRequest cannot be null");
-        }
+    public void updateChatMessage(UpdateMessageRequest request) {
 
-        if (updateMessageReadRequest.messageId() <= 0) {
-            throw new InvalidChatRequestException("messageId must be positive" + updateMessageReadRequest.messageId());
-        }
-
-        ChatMessage message = chatMessageRepository.findById(updateMessageReadRequest.messageId())
+        ChatMessage message = chatMessageRepository.findById(request.messageId())
                 .orElseThrow(()
-                        -> new ChatMessageNotFoundException("Chat message not found with id:" + updateMessageReadRequest.messageId()));
-
-        if (updateMessageReadRequest.message() != null && !updateMessageReadRequest.message().isEmpty()) {
-            message.setMessage(updateMessageReadRequest.message());
-        }
-
+                        -> new ChatMessageNotFoundException("Chat message not found with id:" + request.messageId()));
+        message.setMessage(request.message());
         message.setUpdatedDate(LocalDateTime.now());
         chatMessageRepository.save(message);
     }
 
     @Override
-    public void deleteChatMessage(long chatMessageId) {
-        if (chatMessageId <= 0) {
-            throw new InvalidChatRequestException("Chat Message ID must be positive" + chatMessageId);
-        }
-
-        if (!chatMessageRepository.existsById(chatMessageId)) {
-            throw new ChatMessageNotFoundException("Chat message not found with id: " + chatMessageId);
-        }
-
-        chatMessageRepository.deleteById(chatMessageId);
+    public void deleteChatMessage(long messageId) {
+        chatMessageRepository.deleteById(messageId);
     }
 
     @Override
-    public List<ChatMessageDto> getChatMessagesByMemberId(long chatId, long memberId, Pageable pageable) {
-        if (chatId <= 0) {
-            throw new InvalidChatRequestException("Chat ID must be positive" + chatId);
-        }
-        if (memberId <= 0) {
-            throw new InvalidChatRequestException("Member ID must be positive" + memberId);
-        }
+    public List<ChatMessageDto> getChatMessagesByMemberId(ChatMessageRequest request, Pageable pageable) {
 
-        if (!chatRepository.existsById(chatId)) {
-            throw new ChatNotFoundException(chatId);
-        }
-
-        List<ChatMessage> messages = chatMessageRepository.findByChatIdAndChatMemberId(chatId, memberId, pageable);
+        List<ChatMessage> messages = chatMessageRepository.findByChatIdAndChatMemberId(request.chatId(), request.memberId(), pageable);
         return messages.stream()
                 .map(chatMessageMapper::toDto)
                 .toList();
+    }
+
+    @Transactional
+    public void markAsDelivered(Long messageId) {
+        ChatMessage message = chatMessageRepository.findById(messageId).orElseThrow(
+                () -> new ChatMessageNotFoundException("Chat message not found with id: " + messageId));
+        message.setStatus(MessageStatus.DELIVERED);
+    }
+
+    @Override
+    public List<Long> markAsRead(Long chatId, Long userId, MessageStatus status) {
+        return  chatMessageRepository.markMessagesAsReadAndReturnIds(chatId, userId, MessageStatus.READ);
+    }
+
+    @Override
+    public ChatMessageDto getMessageById(long messageId) {
+        return chatMessageMapper.toDto(chatMessageRepository.findById(messageId).orElseThrow(()
+                -> new ChatMessageNotFoundException("Chat message not found with id: " + messageId)));
     }
 
 }

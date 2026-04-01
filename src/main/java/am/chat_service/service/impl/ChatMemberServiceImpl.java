@@ -1,9 +1,8 @@
 package am.chat_service.service.impl;
 
 import am.chat_service.dto.mapper.ChatMemberMapper;
-import am.chat_service.dto.response.ChatMemberDto;
+import am.chat_service.dto.ChatMemberDto;
 import am.chat_service.exception.ChatMemberNotFoundException;
-import am.chat_service.exception.InvalidChatRequestException;
 import am.chat_service.repository.ChatMemberRepository;
 import am.chat_service.service.ChatMemberService;
 import lombok.RequiredArgsConstructor;
@@ -18,12 +17,8 @@ public class ChatMemberServiceImpl implements ChatMemberService {
 
     @Override
     public ChatMemberDto findById(long memberId) {
-        if (memberId <= 0) {
-            throw new InvalidChatRequestException("ID must be positive" + memberId);
-        }
-
         return chatMemberMapper.toDto(
-                chatMemberRepository.findById(memberId)
-                        .orElseThrow(() -> new ChatMemberNotFoundException(memberId)));
+                chatMemberRepository.findOptionalById(memberId)
+                        .orElseThrow(() -> new ChatMemberNotFoundException("Chat member not found with id: " + memberId)));
     }
 }

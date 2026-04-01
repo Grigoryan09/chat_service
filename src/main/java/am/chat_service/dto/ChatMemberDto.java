@@ -1,4 +1,4 @@
-package am.chat_service.dto.response;
+package am.chat_service.dto;
 
 public record ChatMemberDto(
 

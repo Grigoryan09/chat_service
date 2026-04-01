@@ -1,12 +1,12 @@
 package am.chat_service.service;
 
 import am.chat_service.dto.request.ChangeChatStatusRequest;
-import am.chat_service.dto.request.CreateChatFromExternalRequest;
-import am.chat_service.dto.response.ChatDto;
+import am.chat_service.dto.request.CreateChatRequest;
+import am.chat_service.dto.ChatDto;
 
 public interface ChatService {
 
-    Long createChatFromExternal(CreateChatFromExternalRequest request);
+    ChatDto createChatFromExternal(CreateChatRequest request);
 
     void changeChatStatus(ChangeChatStatusRequest updateChatStatusRequest);
 

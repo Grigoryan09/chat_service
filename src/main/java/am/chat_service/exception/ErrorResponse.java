@@ -15,11 +15,11 @@ import java.util.Map;
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
+
     private LocalDateTime timestamp;
     private int status;
     private String error;
     private String message;
     private String path;
-    private Map<String, Object> details;
 }
 

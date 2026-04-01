@@ -65,10 +65,6 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("INVALID_CHAT_REQUEST")
                 .message(ex.getMessage())
-                .details(Map.of(
-                        "fieldName", ex.getFieldName() != null ? ex.getFieldName() : "unknown",
-                        "reason", ex.getReason() != null ? ex.getReason() : "unknown"
-                ))
                 .build();
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);

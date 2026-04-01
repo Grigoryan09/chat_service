@@ -1,6 +1,6 @@
 package am.chat_service.dto.mapper;
 
-import am.chat_service.dto.response.ChatMemberDto;
+import am.chat_service.dto.ChatMemberDto;
 import am.chat_service.model.ChatMember;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

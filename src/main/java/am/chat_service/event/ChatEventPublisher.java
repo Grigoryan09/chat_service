@@ -1,6 +1,7 @@
 package am.chat_service.event;
 
-import am.chat_service.dto.response.ChatMessageDto;
+import am.chat_service.dto.ChatMessageDto;
+import am.chat_service.model.enums.EventType;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -17,7 +18,7 @@ public class ChatEventPublisher {
     public void publishNewMessage(Long chatId, ChatMessageDto messageDto) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,
-                "new_message",
+                EventType.NEW_MESSAGE,
                 chatId,
                 Map.of("message", messageDto)
         ));
@@ -26,7 +27,7 @@ public class ChatEventPublisher {
     public void publishChatOpened(Long chatId, List<Long> userIds, Map<String, Object> chatData) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,
-                "chat_opened",
+                EventType.CHAT_OPENED,
                 chatId,
                 Map.of("userIds", userIds, "data", chatData)
         ));
@@ -35,7 +36,7 @@ public class ChatEventPublisher {
     public void publishUserJoined(Long chatId, Long userId) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,
-                "user_joined",
+                EventType.USER_JOINED,
                 chatId,
                 Map.of("userId", userId)
         ));
@@ -44,7 +45,7 @@ public class ChatEventPublisher {
     public void publishUserLeft(Long chatId, Long userId) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,
-                "user_left",
+                EventType.USER_LEFT,
                 chatId,
                 Map.of("userId", userId)
         ));

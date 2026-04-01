@@ -4,8 +4,6 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
-
 @Data
 public class SendMessageRequest {
 
@@ -18,7 +16,4 @@ public class SendMessageRequest {
     @NotBlank(message = "Message cannot be blank")
     String message;
 
-    LocalDateTime createdDate;
-
-    LocalDateTime updatedDate;
 }

@@ -4,6 +4,7 @@ import am.chat_service.model.enums.ChatStatus;
 import am.chat_service.model.enums.ChatType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -14,6 +15,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
+@Builder
 @Table(name = "chat")
 public class Chat {
 

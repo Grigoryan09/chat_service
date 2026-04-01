@@ -1,7 +1,7 @@
 package am.chat_service.service;
 
 
-import am.chat_service.dto.response.ChatMemberDto;
+import am.chat_service.dto.ChatMemberDto;
 
 public interface ChatMemberService {
 

@@ -1,7 +1,9 @@
 package am.chat_service.model;
 
+import am.chat_service.model.enums.MessageStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -11,6 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
+@Builder
 @Table(name = "chat_message")
 public class ChatMessage {
 
@@ -31,5 +34,6 @@ public class ChatMessage {
 
     private String message;
 
-    private boolean isRead;
+    @Enumerated(EnumType.STRING)
+    private MessageStatus status;
 }

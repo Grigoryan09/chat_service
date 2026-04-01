@@ -1,4 +1,4 @@
-package am.chat_service.dto.response;
+package am.chat_service.dto;
 
 import java.time.LocalDateTime;
 import java.util.List;
