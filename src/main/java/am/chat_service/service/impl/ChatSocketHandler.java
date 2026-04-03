@@ -1,6 +1,9 @@
 package am.chat_service.service.impl;
 
 import am.chat_service.dto.ChatMessageDto;
+import am.chat_service.dto.request.ChatOpenedAckRequest;
+import am.chat_service.dto.request.MessageDeliveredRequest;
+import am.chat_service.dto.request.MessagesReadRequest;
 import am.chat_service.dto.request.SendMessageRequest;
 import am.chat_service.event.ChatEvent;
 import am.chat_service.exception.SocketConnectionException;
@@ -38,9 +41,10 @@ public class ChatSocketHandler {
         server.addEventListener("send_message", SendMessageRequest.class, this::onSendMessage);
         server.addEventListener("join_chat", Long.class, this::onJoinChat);
         server.addEventListener("leave_chat", Long.class, this::onLeaveChat);
-        server.addEventListener("chat_opened_ack", Map.class, this::onChatOpenedAck);
-        server.addEventListener("messages_read", Map.class, this::onMessagesRead);
-        server.addEventListener("message_delivered", Map.class, this::onMessageDelivered);
+
+        server.addEventListener("chat_opened_ack", ChatOpenedAckRequest.class, this::onChatOpenedAck);
+        server.addEventListener("messages_read", MessagesReadRequest.class, this::onMessagesRead);
+        server.addEventListener("message_delivered", MessageDeliveredRequest.class, this::onMessageDelivered);
     }
 
 
@@ -48,18 +52,17 @@ public class ChatSocketHandler {
         String userIdStr = client.getHandshakeData().getSingleUrlParam("userId");
 
         if (userIdStr == null || userIdStr.isBlank()) {
-            log.warn("Client connected without userId: {}", client.getSessionId());
+            log.warn("Client connected without userId: %s".formatted(client.getSessionId()));
             return;
         }
-
         try {
             Long userId = Long.parseLong(userIdStr.trim());
             userSocketMap.put(userId, client.getSessionId());
-            log.info("✅ User {} connected. SessionId: {}", userId, client.getSessionId());
+            log.info("✅ User %d connected. SessionId: %s".formatted(userId, client.getSessionId()));
         } catch (NumberFormatException e) {
-            log.warn("Invalid userId format: {}", userIdStr);
+            log.warn("Invalid userId format: %s".formatted(userIdStr));
         } catch (Exception e) {
-            log.error("Error in onConnect", e);
+            log.error("Error in onConnect for userId: %s".formatted(userIdStr), e);
         }
     }
 
@@ -112,20 +115,16 @@ public class ChatSocketHandler {
         }
     }
 
-    private void onChatOpenedAck(SocketIOClient client, Map<String, Object> data, AckRequest ackSender) {
+    private void onChatOpenedAck(SocketIOClient client, ChatOpenedAckRequest request, AckRequest ackSender) {
         try {
-            if (data == null || !data.containsKey("chatId")) {
-                return;
-            }
+            if (request.chatId() == null) return;
 
-            Long chatId = ((Number) data.get("chatId")).longValue();
-            client.joinRoom(buildRoom(chatId));
-            log.info("Client acknowledged chat opened and joined room: {}", chatId);
+            client.joinRoom(buildRoom(request.chatId()));
+            log.info("Client acknowledged chat opened and joined room: {}", request.chatId());
         } catch (Exception e) {
             log.warn("Failed to process chat_opened_ack", e);
         }
     }
-
 
     @EventListener
     public void handleChatEvent(ChatEvent event) {
@@ -216,28 +215,25 @@ public class ChatSocketHandler {
         }
     }
 
-    private void onMessageDelivered(SocketIOClient client, Map<String, Object> data, AckRequest ackSender) {
+    private void onMessageDelivered(SocketIOClient client, MessageDeliveredRequest request, AckRequest ackSender) {
         try {
-            Long messageId = ((Number) data.get("messageId")).longValue();
+            Long messageId = request.messageId();
 
             chatMessageService.markAsDelivered(messageId);
 
             ChatMessageDto message = chatMessageService.getMessageById(messageId);
 
-            sendToUser(
-                    message.userId(),
-                    "message_delivered",
-                    Map.of("messageId", messageId)
-            );
+            sendToUser(message.userId(), "message_delivered",
+                    Map.of("messageId", messageId));
 
         } catch (Exception e) {
             log.error("Failed to mark message as delivered", e);
         }
     }
 
-    private void onMessagesRead(SocketIOClient client, Map<String, Object> data, AckRequest ackSender) {
+    private void onMessagesRead(SocketIOClient client, MessagesReadRequest request, AckRequest ackSender) {
         try {
-            Long chatId = ((Number) data.get("chatId")).longValue();
+            Long chatId = request.chatId();
             Long userId = getUserIdFromClient(client);
 
             List<Long> messageIds = chatMessageService.markAsRead(chatId, userId, MessageStatus.READ);
@@ -246,7 +242,6 @@ public class ChatSocketHandler {
                     "userId", userId,
                     "messageIds", messageIds
             ));
-
         } catch (Exception e) {
             log.error("Failed to mark messages as read", e);
         }

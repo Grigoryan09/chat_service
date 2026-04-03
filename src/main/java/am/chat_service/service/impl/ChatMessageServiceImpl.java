@@ -1,14 +1,14 @@
 package am.chat_service.service.impl;
 
-import am.chat_service.dto.mapper.ChatMessageMapper;
+import am.chat_service.dto.ChatMessageDto;
 import am.chat_service.dto.request.ChatMessageRequest;
 import am.chat_service.dto.request.SendMessageRequest;
 import am.chat_service.dto.request.UpdateMessageRequest;
-import am.chat_service.dto.ChatMessageDto;
 import am.chat_service.event.ChatEventPublisher;
 import am.chat_service.exception.ChatMessageNotFoundException;
 import am.chat_service.exception.ChatNotFoundException;
 import am.chat_service.exception.InvalidChatRequestException;
+import am.chat_service.mapper.ChatMessageMapper;
 import am.chat_service.model.Chat;
 import am.chat_service.model.ChatMember;
 import am.chat_service.model.ChatMessage;
@@ -41,23 +41,36 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     @Transactional
     public ChatMessageDto sendMessage(SendMessageRequest request) {
 
-        Chat chat = chatRepository.findById(request.getChatId()).orElseThrow(() -> new ChatNotFoundException("Chat not found with id: " + request.getChatId()));
+        Chat chat = chatRepository.findById(request.getChatId())
+                .orElseThrow(() -> new ChatNotFoundException(
+                        "Chat not found with id: %d".formatted(request.getChatId())
+                ));
+
         ChatMember member = chatMemberRepository.findById(request.getMemberId());
-        if (!Objects.equals(member.getChat().getId(), chat.getId())) {
-            throw new InvalidChatRequestException(
-                    "Member " + member.getId() + " does not belong to chat " + chat.getId()
-            );
-        }
+
+        validateMemberBelongsToChat(member, chat);
 
         chat.setLastActivity(LocalDateTime.now());
         chatRepository.save(chat);
 
+        ChatMessage chatMessage = createMessage(request, chat, member);
         ChatMessageDto messageDto = chatMessageMapper.toDto(
-                chatMessageRepository.save(createMessage(request, chat, member)));
+                chatMessageRepository.save(chatMessage)
+        );
 
         chatEventPublisher.publishNewMessage(request.getChatId(), messageDto);
 
         return messageDto;
+    }
+
+    private void validateMemberBelongsToChat(ChatMember member, Chat chat) {
+        if (!Objects.equals(member.getChat().getId(), chat.getId())) {
+            throw new InvalidChatRequestException(
+                    "Member %d does not belong to chat %d".formatted(
+                            member.getId(), chat.getId()
+                    )
+            );
+        }
     }
 
     private ChatMessage createMessage(SendMessageRequest request, Chat chat, ChatMember member) {
@@ -104,13 +117,15 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
     @Override
     public List<Long> markAsRead(Long chatId, Long userId, MessageStatus status) {
-        return  chatMessageRepository.markMessagesAsReadAndReturnIds(chatId, userId, MessageStatus.READ);
+        return chatMessageRepository.markMessagesAsReadAndReturnIds(chatId, userId, MessageStatus.READ);
     }
 
     @Override
     public ChatMessageDto getMessageById(long messageId) {
         return chatMessageMapper.toDto(chatMessageRepository.findById(messageId).orElseThrow(()
-                -> new ChatMessageNotFoundException("Chat message not found with id: " + messageId)));
+                -> new ChatMessageNotFoundException(
+                "Chat message not found with id: %d".formatted(messageId)
+        )));
     }
 
 }

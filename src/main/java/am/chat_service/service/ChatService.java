@@ -1,14 +1,17 @@
 package am.chat_service.service;
 
+import am.chat_service.dto.ChatDetailDto;
 import am.chat_service.dto.request.ChangeChatStatusRequest;
 import am.chat_service.dto.request.CreateChatRequest;
-import am.chat_service.dto.ChatDto;
+import org.springframework.data.domain.Pageable;
 
 public interface ChatService {
 
-    ChatDto createChatFromExternal(CreateChatRequest request);
+    ChatDetailDto createChatFromExternal(CreateChatRequest request);
 
     void changeChatStatus(ChangeChatStatusRequest updateChatStatusRequest);
 
-    ChatDto findById(long chatId);
+    ChatDetailDto findById(long chatId);
+
+    ChatDetailDto getChatDetail(Long chatId, Pageable pageable);
 }

@@ -1,4 +1,5 @@
 package am.chat_service.dto.request;
+
 import jakarta.validation.constraints.Positive;
 
 public record ChatMessageRequest(
@@ -9,4 +10,5 @@ public record ChatMessageRequest(
         @Positive(message = "Member ID must be positive")
         long memberId
 
-) {}
+) {
+}

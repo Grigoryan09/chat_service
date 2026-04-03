@@ -3,6 +3,7 @@ package am.chat_service.repository;
 import am.chat_service.model.ChatMessage;
 import am.chat_service.model.enums.MessageStatus;
 import jakarta.transaction.Transactional;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
@@ -31,6 +32,8 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                 RETURNING id
             """, nativeQuery = true)
     List<Long> markMessagesAsReadAndReturnIds(Long chatId, Long userId, MessageStatus status);
+
+    Page<ChatMessage> findByChatId(long chatId, Pageable pageable);
 }
 
 
