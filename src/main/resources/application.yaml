@@ -16,3 +16,9 @@ spring:
   liquibase:
     enabled: true
     change-log: classpath:db/master.xml
+  server:
+    port: 8080
+
+socketio:
+  hostname: 0.0.0.0
+  port: 9092
