@@ -1,7 +1,6 @@
 package am.chat_service.repository;
 
 import am.chat_service.model.ChatMessage;
-import am.chat_service.model.enums.MessageStatus;
 import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

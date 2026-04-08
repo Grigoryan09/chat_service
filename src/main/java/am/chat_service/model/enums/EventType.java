@@ -9,11 +9,11 @@ public enum EventType {
 
     private final String value;
 
-    EventType(String value){
+    EventType(String value) {
         this.value = value;
     }
 
-    public String value(){
+    public String value() {
         return value;
     }
 }
