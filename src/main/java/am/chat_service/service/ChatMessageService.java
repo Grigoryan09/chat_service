@@ -15,7 +15,7 @@ public interface ChatMessageService {
 
     void markAsDelivered(Long messageId);
 
-    List<Long> markAsRead(Long chatId, Long userId, MessageStatus status);
+    List<Long> markAsRead(Long chatId, Long userId, String status);
 
     ChatMessageDto getMessageById(long messageId);
 

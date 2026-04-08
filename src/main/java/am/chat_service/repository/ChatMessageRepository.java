@@ -31,7 +31,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
                   AND status != :status
                 RETURNING id
             """, nativeQuery = true)
-    List<Long> markMessagesAsReadAndReturnIds(Long chatId, Long userId, MessageStatus status);
+    List<Long> markMessagesAsReadAndReturnIds(Long chatId, Long userId, String status);
 
     Page<ChatMessage> findByChatId(long chatId, Pageable pageable);
 }

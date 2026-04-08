@@ -13,4 +13,6 @@ public interface ChatMemberService {
     ChatMemberDto findById(long memberId);
 
     List<ChatMember> getChatMembers(CreateChatRequest request, Chat chat);
+
+    List<Long> getMembersByChatId(Long chatId);
 }
