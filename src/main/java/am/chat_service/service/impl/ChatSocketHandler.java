@@ -21,10 +21,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -161,28 +163,17 @@ public class ChatSocketHandler {
 
     private void handleNewMessageEvent(ChatEvent event) {
         Long chatId = event.getChatId();
-        ChatMessageDto message = (ChatMessageDto) event.getPayload().get("message");
+        ChatMessageDto message = extractMessage(event);
+
+        if (message == null) return;
+
         List<Long> userIds = chatMemberService.getMembersByChatId(chatId);
+        if (userIds == null || userIds.isEmpty()) return;
 
-        if (message != null && userIds != null) {
-            List<Long> connectedUsers = userIds.stream()
-                    .filter(userSocketMap::containsKey)
-                    .toList();
+        UsersSplit users = splitUsers(userIds);
 
-            List<Long> offlineUsers = userIds.stream()
-                    .filter(userId -> !userSocketMap.containsKey(userId))
-                    .toList();
-            if (!connectedUsers.isEmpty()) {
-                sendToRoomExceptUser(chatId,
-                        message.userId(),
-                        event.getEventType().value(),
-                        message,
-                        connectedUsers);
-            }
-            if (!offlineUsers.isEmpty()) {
-                notifyOfflineUsers(chatId, offlineUsers, message);
-            }
-        }
+        sendToConnected(chatId, event, message, users.connected());
+        notifyOffline(chatId, message, users.offline());
     }
 
     private void handleUserPresenceEvent(ChatEvent event) {
@@ -302,6 +293,48 @@ public class ChatSocketHandler {
     private Long getUserIdFromClient(SocketIOClient client) {
         String userIdStr = client.getHandshakeData().getSingleUrlParam("userId");
         return Long.parseLong(userIdStr);
+    }
+
+    private ChatMessageDto extractMessage(ChatEvent event) {
+        return (ChatMessageDto) event.getPayload().get("message");
+    }
+
+    private void sendToConnected(Long chatId,
+                                 ChatEvent event,
+                                 ChatMessageDto message,
+                                 List<Long> connectedUsers) {
+
+        if (connectedUsers.isEmpty()) return;
+
+        sendToRoomExceptUser(
+                chatId,
+                message.userId(),
+                event.getEventType().value(),
+                message,
+                connectedUsers
+        );
+    }
+
+    private void notifyOffline(Long chatId,
+                               ChatMessageDto message,
+                               List<Long> offlineUsers) {
+
+        if (offlineUsers == null || offlineUsers.isEmpty()) return;
+
+        notifyOfflineUsers(chatId, offlineUsers, message);
+    }
+
+    private UsersSplit splitUsers(List<Long> userIds) {
+        Map<Boolean, List<Long>> partitioned = userIds.stream()
+                .collect(Collectors.partitioningBy(userSocketMap::containsKey));
+
+        return new UsersSplit(
+                partitioned.getOrDefault(true, Collections.emptyList()),
+                partitioned.getOrDefault(false, Collections.emptyList())
+        );
+    }
+
+    private record UsersSplit(List<Long> connected, List<Long> offline) {
     }
 
 }

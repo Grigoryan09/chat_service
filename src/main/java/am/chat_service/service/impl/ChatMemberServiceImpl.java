@@ -3,7 +3,6 @@ package am.chat_service.service.impl;
 import am.chat_service.dto.ChatMemberDto;
 import am.chat_service.dto.request.CreateChatRequest;
 import am.chat_service.exception.ChatMemberNotFoundException;
-import am.chat_service.exception.ChatNotFoundException;
 import am.chat_service.mapper.ChatMemberMapper;
 import am.chat_service.model.Chat;
 import am.chat_service.model.ChatMember;
@@ -12,6 +11,7 @@ import am.chat_service.service.ChatMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -42,9 +42,7 @@ public class ChatMemberServiceImpl implements ChatMemberService {
     }
 
     public List<Long> getMembersByChatId(Long chatId) {
-        if (chatId != null) {
-            return chatMemberRepository.findUserIdsByChatId(chatId);
-        }
-        throw new ChatNotFoundException("Chat not found");
+        return chatMemberRepository.findUserIdsByChatId(chatId)
+                .orElse(Collections.emptyList());
     }
 }

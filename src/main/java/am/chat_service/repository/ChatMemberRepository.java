@@ -15,5 +15,5 @@ public interface ChatMemberRepository extends JpaRepository<ChatMember, Long> {
     Optional<ChatMember> findOptionalById(long memberId);
 
     @Query("SELECT cm.userId FROM ChatMember cm WHERE cm.chat.id = :chatId")
-    List<Long> findUserIdsByChatId(@Param("chatId") long chatId);
+    Optional<List<Long>> findUserIdsByChatId(@Param("chatId") Long chatId);
 }
