@@ -11,6 +11,7 @@ import am.chat_service.service.ChatMemberService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 
 @Service
@@ -38,5 +39,10 @@ public class ChatMemberServiceImpl implements ChatMemberService {
                     return m;
                 })
                 .toList();
+    }
+
+    public List<Long> getMembersByChatId(Long chatId) {
+        return chatMemberRepository.findUserIdsByChatId(chatId)
+                .orElse(Collections.emptyList());
     }
 }

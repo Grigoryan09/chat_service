@@ -6,8 +6,11 @@ import am.chat_service.dto.request.MessageDeliveredRequest;
 import am.chat_service.dto.request.MessagesReadRequest;
 import am.chat_service.dto.request.SendMessageRequest;
 import am.chat_service.event.ChatEvent;
+import am.chat_service.event.ChatEventPublisher;
 import am.chat_service.exception.SocketConnectionException;
 import am.chat_service.model.enums.MessageStatus;
+import am.chat_service.model.enums.SocketEvent;
+import am.chat_service.service.ChatMemberService;
 import am.chat_service.service.ChatMessageService;
 import com.corundumstudio.socketio.AckRequest;
 import com.corundumstudio.socketio.SocketIOClient;
@@ -18,10 +21,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +35,8 @@ public class ChatSocketHandler {
 
     private final SocketIOServer server;
     private final ChatMessageService chatMessageService;
+    private final ChatEventPublisher eventPublisher;
+    private final ChatMemberService chatMemberService;
 
     private final Map<Long, UUID> userSocketMap = new ConcurrentHashMap<>();
 
@@ -38,13 +45,13 @@ public class ChatSocketHandler {
         server.addConnectListener(this::onConnect);
         server.addDisconnectListener(this::onDisconnect);
 
-        server.addEventListener("send_message", SendMessageRequest.class, this::onSendMessage);
-        server.addEventListener("join_chat", Long.class, this::onJoinChat);
-        server.addEventListener("leave_chat", Long.class, this::onLeaveChat);
+        server.addEventListener(SocketEvent.SEND_MESSAGE.value(), SendMessageRequest.class, this::onSendMessage);
+        server.addEventListener(SocketEvent.JOIN_CHAT.value(), Long.class, this::onJoinChat);
+        server.addEventListener(SocketEvent.LEAVE_CHAT.value(), Long.class, this::onLeaveChat);
 
-        server.addEventListener("chat_opened_ack", ChatOpenedAckRequest.class, this::onChatOpenedAck);
-        server.addEventListener("messages_read", MessagesReadRequest.class, this::onMessagesRead);
-        server.addEventListener("message_delivered", MessageDeliveredRequest.class, this::onMessageDelivered);
+        server.addEventListener(SocketEvent.CHAT_OPENED_ACK.value(), ChatOpenedAckRequest.class, this::onChatOpenedAck);
+        server.addEventListener(SocketEvent.MESSAGES_READ.value(), MessagesReadRequest.class, this::onMessagesRead);
+        server.addEventListener(SocketEvent.MESSAGE_DELIVERED.value(), MessageDeliveredRequest.class, this::onMessageDelivered);
     }
 
 
@@ -77,6 +84,8 @@ public class ChatSocketHandler {
     private void onJoinChat(SocketIOClient client, Long chatId, AckRequest ackSender) {
         try {
             client.joinRoom(buildRoom(chatId));
+            Long userId = getUserIdFromClient(client);
+            eventPublisher.publishUserJoined(chatId, userId);
             log.info("Client {} joined room: chat_{}", client.getSessionId(), chatId);
 
             if (ackSender.isAckRequested()) {
@@ -91,6 +100,8 @@ public class ChatSocketHandler {
     private void onLeaveChat(SocketIOClient client, Long chatId, AckRequest ackSender) {
         try {
             client.leaveRoom(buildRoom(chatId));
+            Long userId = getUserIdFromClient(client);
+            eventPublisher.publishUserLeft(chatId, userId);
             log.info("Client {} left room: chat_{}", client.getSessionId(), chatId);
         } catch (Exception e) {
             log.error("Error leaving chat {}", chatId, e);
@@ -100,8 +111,6 @@ public class ChatSocketHandler {
     private void onSendMessage(SocketIOClient client, SendMessageRequest request, AckRequest ackSender) {
         try {
             ChatMessageDto savedMessage = chatMessageService.sendMessage(request);
-
-            sendToRoom(request.getChatId(), "new_message", savedMessage);
 
             if (ackSender.isAckRequested()) {
                 ackSender.sendAckData(savedMessage);
@@ -148,27 +157,36 @@ public class ChatSocketHandler {
         if (userIds == null) return;
 
         for (Long userId : userIds) {
-            sendToUser(userId, "chat_opened", chatData);
+            sendToUser(userId, event.getEventType().value(), chatData);
         }
     }
 
     private void handleNewMessageEvent(ChatEvent event) {
         Long chatId = event.getChatId();
-        ChatMessageDto message = (ChatMessageDto) event.getPayload().get("message");
-        @SuppressWarnings("unchecked")
-        List<Long> userIds = (List<Long>) event.getPayload().get("userIds");
+        ChatMessageDto message = extractMessage(event);
 
-        if (message != null) {
-            sendToRoom(chatId, "new_message", message);
-            if (userIds != null) {
-                notifyOfflineUsers(chatId, userIds, message);
-            }
-        }
+        if (message == null) return;
+
+        List<Long> userIds = chatMemberService.getMembersByChatId(chatId);
+        if (userIds == null || userIds.isEmpty()) return;
+
+        UsersSplit users = splitUsers(userIds);
+
+        sendToConnected(chatId, event, message, users.connected());
+        notifyOffline(chatId, message, users.offline());
     }
 
     private void handleUserPresenceEvent(ChatEvent event) {
-        log.info("User presence event received: {} in chat {}",
-                event.getEventType(), event.getChatId());
+        Long chatId = event.getChatId();
+        Long userId = (Long) event.getPayload().get("userId");
+
+        if (userId == null) return;
+
+        String eventName = event.getEventType().value();
+
+        if (eventName != null) {
+            sendToRoom(chatId, eventName, Map.of("userId", userId));
+        }
     }
 
     public void sendToUser(Long userId, String event, Object data) {
@@ -197,6 +215,30 @@ public class ChatSocketHandler {
         server.getRoomOperations(buildRoom(chatId)).sendEvent(event, data);
     }
 
+    private void sendToRoomExceptUser(Long chatId,
+                                      Long excludedUserId,
+                                      String event,
+                                      Object data,
+                                      List<Long> connectedUsers) {
+        for (SocketIOClient roomClient : server.getRoomOperations(buildRoom(chatId)).getClients()) {
+            String userIdStr = roomClient.getHandshakeData().getSingleUrlParam("userId");
+
+            if (userIdStr == null || userIdStr.isBlank()) {
+                continue;
+            }
+
+            Long roomUserId;
+            try {
+                roomUserId = Long.parseLong(userIdStr);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (!roomUserId.equals(excludedUserId) && connectedUsers.contains(roomUserId)) {
+                roomClient.sendEvent(event, data);
+            }
+        }
+    }
+
     private void notifyOfflineUsers(Long chatId, List<Long> userIds, ChatMessageDto message) {
         for (Long userId : userIds) {
             UUID sessionId = userSocketMap.get(userId);
@@ -210,7 +252,7 @@ public class ChatSocketHandler {
             boolean inRoom = client.getAllRooms().contains(buildRoom(chatId));
 
             if (!inRoom) {
-                sendToUser(userId, "new_message_notification", message);
+                sendToUser(userId, SocketEvent.MESSAGE_NOTIFICATION.value(), message);
             }
         }
     }
@@ -223,7 +265,7 @@ public class ChatSocketHandler {
 
             ChatMessageDto message = chatMessageService.getMessageById(messageId);
 
-            sendToUser(message.userId(), "message_delivered",
+            sendToUser(message.userId(), SocketEvent.MESSAGE_DELIVERED.value(),
                     Map.of("messageId", messageId));
 
         } catch (Exception e) {
@@ -236,12 +278,13 @@ public class ChatSocketHandler {
             Long chatId = request.chatId();
             Long userId = getUserIdFromClient(client);
 
-            List<Long> messageIds = chatMessageService.markAsRead(chatId, userId, MessageStatus.READ);
+            List<Long> messageIds = chatMessageService.markAsRead(chatId, userId, MessageStatus.READ.name());
 
             sendToRoom(chatId, "messages_read", Map.of(
                     "userId", userId,
                     "messageIds", messageIds
             ));
+            log.info("Message status changed");
         } catch (Exception e) {
             log.error("Failed to mark messages as read", e);
         }
@@ -250,6 +293,48 @@ public class ChatSocketHandler {
     private Long getUserIdFromClient(SocketIOClient client) {
         String userIdStr = client.getHandshakeData().getSingleUrlParam("userId");
         return Long.parseLong(userIdStr);
+    }
+
+    private ChatMessageDto extractMessage(ChatEvent event) {
+        return (ChatMessageDto) event.getPayload().get("message");
+    }
+
+    private void sendToConnected(Long chatId,
+                                 ChatEvent event,
+                                 ChatMessageDto message,
+                                 List<Long> connectedUsers) {
+
+        if (connectedUsers.isEmpty()) return;
+
+        sendToRoomExceptUser(
+                chatId,
+                message.userId(),
+                event.getEventType().value(),
+                message,
+                connectedUsers
+        );
+    }
+
+    private void notifyOffline(Long chatId,
+                               ChatMessageDto message,
+                               List<Long> offlineUsers) {
+
+        if (offlineUsers == null || offlineUsers.isEmpty()) return;
+
+        notifyOfflineUsers(chatId, offlineUsers, message);
+    }
+
+    private UsersSplit splitUsers(List<Long> userIds) {
+        Map<Boolean, List<Long>> partitioned = userIds.stream()
+                .collect(Collectors.partitioningBy(userSocketMap::containsKey));
+
+        return new UsersSplit(
+                partitioned.getOrDefault(true, Collections.emptyList()),
+                partitioned.getOrDefault(false, Collections.emptyList())
+        );
+    }
+
+    private record UsersSplit(List<Long> connected, List<Long> offline) {
     }
 
 }

@@ -116,8 +116,8 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     }
 
     @Override
-    public List<Long> markAsRead(Long chatId, Long userId, MessageStatus status) {
-        return chatMessageRepository.markMessagesAsReadAndReturnIds(chatId, userId, MessageStatus.READ);
+    public List<Long> markAsRead(Long chatId, Long userId, String status) {
+        return chatMessageRepository.markMessagesAsReadAndReturnIds(chatId, userId, status);
     }
 
     @Override
