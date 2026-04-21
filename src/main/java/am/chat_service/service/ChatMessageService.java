@@ -63,7 +63,7 @@ public interface ChatMessageService {
     /**
      * Returns paginated chat messages available to a member.
      *
-     * @param request message query payload
+     * @param request  message query payload
      * @param pageable pagination settings
      * @return paginated message details
      */

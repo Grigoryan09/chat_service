@@ -36,7 +36,7 @@ public interface ChatService {
     /**
      * Returns chat details together with a paginated slice of messages.
      *
-     * @param chatId chat identifier
+     * @param chatId   chat identifier
      * @param pageable pagination settings for messages
      * @return chat details with messages page
      */

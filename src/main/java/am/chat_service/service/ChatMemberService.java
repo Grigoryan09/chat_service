@@ -25,7 +25,7 @@ public interface ChatMemberService {
      * Builds chat member entities for a newly created chat.
      *
      * @param request chat creation payload
-     * @param chat persisted chat entity
+     * @param chat    persisted chat entity
      * @return list of chat member entities
      */
     List<ChatMember> getChatMembers(CreateChatRequest request, Chat chat);
