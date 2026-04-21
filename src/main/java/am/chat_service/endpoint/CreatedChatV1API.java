@@ -2,6 +2,8 @@ package am.chat_service.endpoint;
 
 import am.chat_service.dto.request.CreateChatRequest;
 import am.chat_service.dto.response.ChatResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequestMapping("/chat-service/api/v1/chats")
+@Tag(name = "Chats", description = "Endpoints for creating chats and retrieving chat details")
 public interface CreatedChatV1API {
 
     /**
@@ -37,6 +40,7 @@ public interface CreatedChatV1API {
      * @throws jakarta.validation.ConstraintViolationException if validation fails
      */
     @PostMapping()
+    @Operation(summary = "Create chat", description = "Creates a new chat from an external request payload.")
     ChatResponse createChatFromExternal(
             @RequestBody @Valid CreateChatRequest request);
 
@@ -60,6 +64,7 @@ public interface CreatedChatV1API {
      *
      */
     @GetMapping("/{id}")
+    @Operation(summary = "Get chat details", description = "Returns chat metadata together with paginated messages.")
     ChatResponse getChatDetail(
             @PathVariable Long id,
             Pageable pageable
