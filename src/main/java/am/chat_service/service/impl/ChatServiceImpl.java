@@ -50,22 +50,32 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatDetailDto createChatFromExternal(CreateChatRequest request) {
+        try {
+            validateUsers(request.userIds());
+            ChatType type = resolveChatType(request);
+            Chat chat = createChatEntity(request, type);
+            Chat savedChat = chatRepository.save(chat);
 
-        validateUsers(request.userIds());
+            ChatMessage firstMessage = createFirstMessage(savedChat);
+            ChatMessageDto savedMsg = chatMessageMapper.toDto(firstMessage);
 
-        ChatType type = resolveChatType(request);
+            publishEvents(savedChat, request.userIds(), type, savedMsg);
 
-        Chat chat = createChatEntity(request, type);
+            ChatDetailDto dto = chatMapper.toDto(savedChat);
 
-        Chat savedChat = chatRepository.save(chat);
+            return dto.toBuilder()
+                    .status("SUCCESS")
+                    .message("Chat created successfully")
+                    .timestamp(LocalDateTime.now())
+                    .build();
 
-        ChatMessage firstMessage = createFirstMessage(savedChat);
-
-        ChatMessageDto savedMsg = chatMessageMapper.toDto(firstMessage);
-
-        publishEvents(savedChat, request.userIds(), type, savedMsg);
-
-        return chatMapper.toDto(savedChat);
+        } catch (Exception e) {
+            return ChatDetailDto.builder()
+                    .status("ERROR")
+                    .message("Failed to create chat: " + e.getMessage())
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        }
     }
 
     @Override

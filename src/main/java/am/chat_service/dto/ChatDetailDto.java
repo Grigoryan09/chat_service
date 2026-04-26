@@ -9,10 +9,13 @@ import org.springframework.data.domain.Page;
 import java.time.LocalDateTime;
 import java.util.List;
 
-@Builder
+@Builder(toBuilder = true)
 @Getter
-
 public class ChatDetailDto {
+
+    private String status;
+    private String message;
+    private LocalDateTime timestamp;
 
     private Long id;
     private ChatType chatType;

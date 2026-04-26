@@ -8,19 +8,64 @@ import org.springframework.data.domain.Pageable;
 
 import java.util.List;
 
+/**
+ * Service for sending, updating and retrieving chat messages.
+ */
 public interface ChatMessageService {
 
+    /**
+     * Sends a new message to a chat.
+     *
+     * @param sendMessageRequest message payload
+     * @return sent message details
+     */
     ChatMessageDto sendMessage(SendMessageRequest sendMessageRequest);
 
+    /**
+     * Marks a message as delivered.
+     *
+     * @param messageId message identifier
+     */
     void markAsDelivered(Long messageId);
 
+    /**
+     * Marks chat messages as read for a specific user.
+     *
+     * @param chatId chat identifier
+     * @param userId user identifier
+     * @param status target message status
+     * @return identifiers of messages that were updated
+     */
     List<Long> markAsRead(Long chatId, Long userId, String status);
 
+    /**
+     * Finds a message by its identifier.
+     *
+     * @param messageId message identifier
+     * @return message details
+     */
     ChatMessageDto getMessageById(long messageId);
 
+    /**
+     * Updates an existing chat message.
+     *
+     * @param updateMessageReadRequest message update payload
+     */
     void updateChatMessage(UpdateMessageRequest updateMessageReadRequest);
 
+    /**
+     * Deletes a chat message by identifier.
+     *
+     * @param chatMessageId message identifier
+     */
     void deleteChatMessage(long chatMessageId);
 
+    /**
+     * Returns paginated chat messages available to a member.
+     *
+     * @param request  message query payload
+     * @param pageable pagination settings
+     * @return paginated message details
+     */
     List<ChatMessageDto> getChatMessagesByMemberId(ChatMessageRequest request, Pageable pageable);
 }
