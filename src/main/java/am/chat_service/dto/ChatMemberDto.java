@@ -2,6 +2,7 @@ package am.chat_service.dto;
 
 public record ChatMemberDto(
 
-        long userId
+        Long id,
+        Long userId
 ) {
 }

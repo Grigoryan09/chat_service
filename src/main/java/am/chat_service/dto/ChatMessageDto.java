@@ -6,8 +6,8 @@ import java.time.LocalDateTime;
 
 public record ChatMessageDto(
 
-        long id,
-        long userId,
+        Long id,
+        Long userId,
         String message,
         MessageStatus status,
         LocalDateTime createdDate,

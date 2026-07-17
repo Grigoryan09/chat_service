@@ -1,6 +1,7 @@
 package am.chat_service.service;
 
 import am.chat_service.dto.ChatDetailDto;
+import am.chat_service.dto.UserChatsDto;
 import am.chat_service.dto.request.ChangeChatStatusRequest;
 import am.chat_service.dto.request.CreateChatRequest;
 import org.springframework.data.domain.Pageable;
@@ -41,4 +42,22 @@ public interface ChatService {
      * @return chat details with messages page
      */
     ChatDetailDto getChatDetail(Long chatId, Pageable pageable);
+
+    /**
+     * Returns a paginated list of chats the user participates in,
+     * most recently active first, excluding archived chats.
+     *
+     * @param userId   user identifier
+     * @param pageable pagination settings
+     * @return DTO holding a page of chat summaries
+     */
+    UserChatsDto getUserChats(Long userId, Pageable pageable);
+
+    /**
+     * Soft-deletes a chat by moving it to the archived state and
+     * notifying participants.
+     *
+     * @param chatId chat identifier
+     */
+    void deleteChat(long chatId);
 }

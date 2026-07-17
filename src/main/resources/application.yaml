@@ -5,20 +5,31 @@ spring:
     url: jdbc:postgresql://localhost:5434/postgres?currentSchema=chat_service
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
-    jpa:
-      show-sql: false
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: none
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
       hibernate:
-        ddl-auto: none
-      database-platform: org.hibernate.dialect.PostgreSQLDialect
-      properties:
-        hibernate:
-          default_schema: chat_service
+        default_schema: chat_service
   liquibase:
     enabled: true
     change-log: classpath:db/master.xml
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: chat-service
+      auto-offset-reset: earliest
 server:
   port: 8081
 
 socketio:
   hostname: 0.0.0.0
   port: 9093
+
+kafka:
+  topics:
+    chat-status-update: chat-status-update-events
+    order-document-request: order-document-request-events
+    chat-document-message: chat-document-message-events

@@ -8,7 +8,9 @@ public enum SocketEvent {
     CHAT_OPENED_ACK("chat_opened_ack"),
     MESSAGES_READ("messages_read"),
     MESSAGE_DELIVERED("message_delivered"),
-    MESSAGE_NOTIFICATION("new_message_notification");
+    MESSAGE_NOTIFICATION("new_message_notification"),
+    UPDATE_MESSAGE("update_message"),
+    DELETE_MESSAGE("delete_message");
 
     private final String value;
 

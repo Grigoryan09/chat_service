@@ -22,6 +22,17 @@ public interface ChatMessageService {
     ChatMessageDto sendMessage(SendMessageRequest sendMessageRequest);
 
     /**
+     * Sends a system message (e.g. a generated document link) to a chat on behalf
+     * of the member identified by the given user id.
+     *
+     * @param chatId       chat identifier
+     * @param senderUserId user id of the member the message is attributed to
+     * @param message      message text
+     * @return sent message details
+     */
+    ChatMessageDto sendDocumentMessage(long chatId, long senderUserId, String message);
+
+    /**
      * Marks a message as delivered.
      *
      * @param messageId message identifier
@@ -50,8 +61,9 @@ public interface ChatMessageService {
      * Updates an existing chat message.
      *
      * @param updateMessageReadRequest message update payload
+     * @return updated message details
      */
-    void updateChatMessage(UpdateMessageRequest updateMessageReadRequest);
+    ChatMessageDto updateChatMessage(UpdateMessageRequest updateMessageReadRequest);
 
     /**
      * Deletes a chat message by identifier.

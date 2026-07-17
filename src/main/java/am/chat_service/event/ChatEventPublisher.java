@@ -24,6 +24,33 @@ public class ChatEventPublisher {
         ));
     }
 
+    public void publishMessageUpdated(Long chatId, ChatMessageDto messageDto) {
+        eventPublisher.publishEvent(new ChatEvent(
+                this,
+                EventType.MESSAGE_UPDATED,
+                chatId,
+                Map.of("message", messageDto)
+        ));
+    }
+
+    public void publishMessageDeleted(Long chatId, Long messageId) {
+        eventPublisher.publishEvent(new ChatEvent(
+                this,
+                EventType.MESSAGE_DELETED,
+                chatId,
+                Map.of("messageId", messageId)
+        ));
+    }
+
+    public void publishChatArchived(Long chatId) {
+        eventPublisher.publishEvent(new ChatEvent(
+                this,
+                EventType.CHAT_ARCHIVED,
+                chatId,
+                Map.of("chatId", chatId)
+        ));
+    }
+
     public void publishChatOpened(Long chatId, List<Long> userIds, Map<String, Object> chatData) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,

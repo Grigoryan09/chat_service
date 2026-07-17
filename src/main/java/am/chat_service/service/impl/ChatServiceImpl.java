@@ -2,6 +2,8 @@ package am.chat_service.service.impl;
 
 import am.chat_service.dto.ChatDetailDto;
 import am.chat_service.dto.ChatMessageDto;
+import am.chat_service.dto.ChatSummaryDto;
+import am.chat_service.dto.UserChatsDto;
 import am.chat_service.dto.request.ChangeChatStatusRequest;
 import am.chat_service.dto.request.CreateChatRequest;
 import am.chat_service.event.ChatEventPublisher;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,32 +53,24 @@ public class ChatServiceImpl implements ChatService {
     @Override
     @Transactional
     public ChatDetailDto createChatFromExternal(CreateChatRequest request) {
-        try {
-            validateUsers(request.userIds());
-            ChatType type = resolveChatType(request);
-            Chat chat = createChatEntity(request, type);
-            Chat savedChat = chatRepository.save(chat);
+        validateUsers(request.userIds());
+        ChatType type = resolveChatType(request);
+        Chat chat = createChatEntity(request, type);
+        Chat savedChat = chatRepository.save(chat);
 
-            ChatMessage firstMessage = createFirstMessage(savedChat);
-            ChatMessageDto savedMsg = chatMessageMapper.toDto(firstMessage);
+        ChatMessage firstMessage = createFirstMessage(savedChat);
+        ChatMessage savedFirstMessage = chatMessageRepository.save(firstMessage);
+        ChatMessageDto savedMsg = chatMessageMapper.toDto(savedFirstMessage);
 
-            publishEvents(savedChat, request.userIds(), type, savedMsg);
+        publishEvents(savedChat, request.userIds(), type, savedMsg);
 
-            ChatDetailDto dto = chatMapper.toDto(savedChat);
+        return chatMapper.toDto(savedChat)
+                .toBuilder()
 
-            return dto.toBuilder()
-                    .status("SUCCESS")
-                    .message("Chat created successfully")
-                    .timestamp(LocalDateTime.now())
-                    .build();
-
-        } catch (Exception e) {
-            return ChatDetailDto.builder()
-                    .status("ERROR")
-                    .message("Failed to create chat: " + e.getMessage())
-                    .timestamp(LocalDateTime.now())
-                    .build();
-        }
+                .status("SUCCESS")
+                .message("Chat created successfully")
+                .timestamp(LocalDateTime.now())
+                .build();
     }
 
     @Override
@@ -119,15 +114,39 @@ public class ChatServiceImpl implements ChatService {
                 .build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public UserChatsDto getUserChats(Long userId, Pageable pageable) {
+        Page<ChatSummaryDto> chats = chatRepository.findChatsByUserId(userId, pageable)
+                .map(chatMapper::toSummary);
+        return new UserChatsDto(chats);
+    }
+
+    @Override
+    @Transactional
+    public void deleteChat(long chatId) {
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ChatNotFoundException(
+                        "Chat with id %d not found".formatted(chatId)
+                ));
+
+        chat.setChatStatus(ChatStatus.ARCHIVED);
+        chatRepository.save(chat);
+
+        chatEventPublisher.publishChatArchived(chatId);
+    }
+
     private void validateUsers(List<Long> userIds) {
-        Set<Long> uniqueIds = new HashSet<>(userIds);
-        if (uniqueIds.size() != userIds.size()) {
+        Set<Long> seen = new HashSet<>();
+        Set<Long> duplicates = new LinkedHashSet<>();
+        for (Long userId : userIds) {
+            if (!seen.add(userId)) {
+                duplicates.add(userId);
+            }
+        }
+        if (!duplicates.isEmpty()) {
             throw new DuplicateUserInChatException(
-                    "Duplicate user IDs found in the request: [%s]"
-                            .formatted(userIds.stream()
-                                    .map(String::valueOf)
-                                    .reduce((a, b) -> a + ", " + b)
-                                    .orElse(""))
+                    "Duplicate user IDs found in the request: %s".formatted(duplicates)
             );
         }
     }

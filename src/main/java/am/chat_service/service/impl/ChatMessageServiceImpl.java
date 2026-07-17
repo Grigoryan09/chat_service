@@ -5,6 +5,7 @@ import am.chat_service.dto.request.ChatMessageRequest;
 import am.chat_service.dto.request.SendMessageRequest;
 import am.chat_service.dto.request.UpdateMessageRequest;
 import am.chat_service.event.ChatEventPublisher;
+import am.chat_service.exception.ChatMemberNotFoundException;
 import am.chat_service.exception.ChatMessageNotFoundException;
 import am.chat_service.exception.ChatNotFoundException;
 import am.chat_service.exception.InvalidChatRequestException;
@@ -46,7 +47,10 @@ public class ChatMessageServiceImpl implements ChatMessageService {
                         "Chat not found with id: %d".formatted(request.getChatId())
                 ));
 
-        ChatMember member = chatMemberRepository.findById(request.getMemberId());
+        ChatMember member = chatMemberRepository.findOptionalById(request.getMemberId())
+                .orElseThrow(() -> new ChatMemberNotFoundException(
+                        "Chat member not found with id: %d".formatted(request.getMemberId())
+                ));
 
         validateMemberBelongsToChat(member, chat);
 
@@ -59,6 +63,40 @@ public class ChatMessageServiceImpl implements ChatMessageService {
         );
 
         chatEventPublisher.publishNewMessage(request.getChatId(), messageDto);
+
+        return messageDto;
+    }
+
+    @Override
+    @Transactional
+    public ChatMessageDto sendDocumentMessage(long chatId, long senderUserId, String message) {
+
+        Chat chat = chatRepository.findById(chatId)
+                .orElseThrow(() -> new ChatNotFoundException(
+                        "Chat not found with id: %d".formatted(chatId)
+                ));
+
+        ChatMember member = chatMemberRepository.findByChatIdAndUserId(chatId, senderUserId)
+                .orElseThrow(() -> new ChatMemberNotFoundException(
+                        "Chat member not found in chat %d for user %d".formatted(chatId, senderUserId)
+                ));
+
+        chat.setLastActivity(LocalDateTime.now());
+        chatRepository.save(chat);
+
+        ChatMessage chatMessage = ChatMessage.builder()
+                .chat(chat)
+                .chatMember(member)
+                .createdDate(LocalDateTime.now())
+                .message(message)
+                .status(MessageStatus.SENT)
+                .build();
+
+        ChatMessageDto messageDto = chatMessageMapper.toDto(
+                chatMessageRepository.save(chatMessage)
+        );
+
+        chatEventPublisher.publishNewMessage(chatId, messageDto);
 
         return messageDto;
     }
@@ -84,19 +122,33 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     }
 
     @Override
-    public void updateChatMessage(UpdateMessageRequest request) {
+    @Transactional
+    public ChatMessageDto updateChatMessage(UpdateMessageRequest request) {
 
         ChatMessage message = chatMessageRepository.findById(request.messageId())
                 .orElseThrow(()
                         -> new ChatMessageNotFoundException("Chat message not found with id:" + request.messageId()));
         message.setMessage(request.message());
         message.setUpdatedDate(LocalDateTime.now());
-        chatMessageRepository.save(message);
+
+        ChatMessageDto messageDto = chatMessageMapper.toDto(chatMessageRepository.save(message));
+
+        chatEventPublisher.publishMessageUpdated(message.getChat().getId(), messageDto);
+
+        return messageDto;
     }
 
     @Override
+    @Transactional
     public void deleteChatMessage(long messageId) {
-        chatMessageRepository.deleteById(messageId);
+        ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new ChatMessageNotFoundException(
+                        "Chat message not found with id: " + messageId));
+
+        Long chatId = message.getChat().getId();
+        chatMessageRepository.delete(message);
+
+        chatEventPublisher.publishMessageDeleted(chatId, messageId);
     }
 
     @Override
