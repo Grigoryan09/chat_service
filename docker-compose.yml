@@ -25,7 +25,9 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/postgres?currentSchema=chat_service
+      # Address the DB by its unique container name: the shared agro_trade_default
+      # network also has a "postgres" host, so the short name resolves ambiguously.
+      SPRING_DATASOURCE_URL: jdbc:postgresql://chat_postgres:5432/postgres?currentSchema=chat_service
       DB_USERNAME: postgres
       DB_PASSWORD: postgres
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
