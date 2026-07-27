@@ -35,8 +35,10 @@ services:
       - "8081:8081"
       - "9093:9093"
     networks:
-      - default
-      - kafka
+      default:
+      kafka:
+        aliases:
+          - chat-service
 
 networks:
   # External network created by the agro_trade compose project (shared Kafka).
