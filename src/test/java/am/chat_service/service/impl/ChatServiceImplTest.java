@@ -78,7 +78,7 @@ class ChatServiceImplTest {
     void createChatFromExternal_reportsOnlyOffendingDuplicateId() {
         // buyerId=15, sellerId=14, managerId=15 -> the production incident payload
         CreateChatRequest request =
-                new CreateChatRequest(List.of(15L, 14L, 15L), ChatType.GROUP);
+                new CreateChatRequest(List.of(15L, 14L, 15L), ChatType.GROUP, null);
 
         assertThatThrownBy(() -> chatService.createChatFromExternal(request))
                 .isInstanceOf(DuplicateUserInChatException.class)
@@ -88,7 +88,7 @@ class ChatServiceImplTest {
     @Test
     void createChatFromExternal_listsEachDuplicateOnceInEncounterOrder() {
         CreateChatRequest request =
-                new CreateChatRequest(List.of(15L, 14L, 15L, 14L, 15L), ChatType.GROUP);
+                new CreateChatRequest(List.of(15L, 14L, 15L, 14L, 15L), ChatType.GROUP, null);
 
         assertThatThrownBy(() -> chatService.createChatFromExternal(request))
                 .isInstanceOf(DuplicateUserInChatException.class)
@@ -98,7 +98,7 @@ class ChatServiceImplTest {
     @Test
     void createChatFromExternal_withDuplicates_touchesNoCollaborators() {
         CreateChatRequest request =
-                new CreateChatRequest(List.of(1L, 1L), ChatType.GROUP);
+                new CreateChatRequest(List.of(1L, 1L), ChatType.GROUP, null);
 
         assertThatThrownBy(() -> chatService.createChatFromExternal(request))
                 .isInstanceOf(DuplicateUserInChatException.class);
@@ -112,7 +112,7 @@ class ChatServiceImplTest {
     @Test
     void createChatFromExternal_persistsChatFirstMessageAndPublishesEvents() {
         List<Long> userIds = List.of(101L, 202L);
-        CreateChatRequest request = new CreateChatRequest(userIds, ChatType.ONE_TO_ONE);
+        CreateChatRequest request = new CreateChatRequest(userIds, ChatType.ONE_TO_ONE, null);
 
         Chat savedChat = new Chat();
         savedChat.setId(42L);
@@ -139,9 +139,61 @@ class ChatServiceImplTest {
         verify(chatEventPublisher).publishNewMessage(42L, firstMsgDto);
     }
 
+    // ---- createChatFromExternal (idempotency by orderId) -------------------
+
+    @Test
+    void createChatFromExternal_orderAlreadyHasChat_returnsExistingWithoutCreatingDuplicate() {
+        CreateChatRequest request = new CreateChatRequest(List.of(101L, 202L, 303L), ChatType.GROUP, 7L);
+
+        Chat existing = new Chat();
+        existing.setId(42L);
+        existing.setOrderId(7L);
+
+        when(chatRepository.findByOrderId(7L)).thenReturn(Optional.of(existing));
+        when(chatMapper.toDto(existing)).thenReturn(ChatDetailDto.builder().id(42L).build());
+
+        ChatDetailDto result = chatService.createChatFromExternal(request);
+
+        assertThat(result.getId()).isEqualTo(42L);
+        assertThat(result.getStatus()).isEqualTo("SUCCESS");
+        assertThat(result.getMessage()).isEqualTo("Chat already exists for this order");
+
+        verify(chatRepository, never()).save(any());
+        verify(chatMessageRepository, never()).save(any());
+        verify(chatEventPublisher, never()).publishChatOpened(any(), anyList(), any());
+    }
+
+    @Test
+    void createChatFromExternal_orderIdSetAndUnused_persistsChatCarryingOrderId() {
+        List<Long> userIds = List.of(101L, 202L, 303L);
+        CreateChatRequest request = new CreateChatRequest(userIds, ChatType.GROUP, 7L);
+
+        Chat savedChat = new Chat();
+        savedChat.setId(42L);
+        savedChat.setOrderId(7L);
+        savedChat.setChatType(ChatType.GROUP);
+        savedChat.setChatMessages(new ArrayList<>());
+
+        when(chatRepository.findByOrderId(7L)).thenReturn(Optional.empty());
+        when(chatMemberService.getChatMembers(eq(request), any(Chat.class))).thenReturn(List.of());
+        when(chatRepository.save(any(Chat.class))).thenReturn(savedChat);
+        when(chatMessageRepository.save(any(ChatMessage.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(chatMessageMapper.toDto(any(ChatMessage.class))).thenReturn(messageDto());
+        when(chatMapper.toDto(savedChat)).thenReturn(ChatDetailDto.builder().id(42L).build());
+
+        ChatDetailDto result = chatService.createChatFromExternal(request);
+
+        assertThat(result.getId()).isEqualTo(42L);
+
+        ArgumentCaptor<Chat> captor = ArgumentCaptor.forClass(Chat.class);
+        verify(chatRepository).save(captor.capture());
+        assertThat(captor.getValue().getOrderId()).isEqualTo(7L);
+    }
+
     @Test
     void createChatFromExternal_defaultsToOneToOneForTwoUsersWhenTypeNull() {
-        CreateChatRequest request = new CreateChatRequest(List.of(1L, 2L), null);
+        CreateChatRequest request = new CreateChatRequest(List.of(1L, 2L), null, null);
 
         Chat savedChat = new Chat();
         savedChat.setId(7L);
@@ -164,7 +216,7 @@ class ChatServiceImplTest {
 
     @Test
     void createChatFromExternal_defaultsToGroupForMoreThanTwoUsersWhenTypeNull() {
-        CreateChatRequest request = new CreateChatRequest(List.of(1L, 2L, 3L), null);
+        CreateChatRequest request = new CreateChatRequest(List.of(1L, 2L, 3L), null, null);
 
         Chat savedChat = new Chat();
         savedChat.setId(8L);

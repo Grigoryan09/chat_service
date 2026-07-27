@@ -64,7 +64,7 @@ class ChatMemberServiceImplTest {
         Chat chat = new Chat();
         chat.setId(1L);
         CreateChatRequest request =
-                new CreateChatRequest(List.of(10L, 20L, 30L), ChatType.GROUP);
+                new CreateChatRequest(List.of(10L, 20L, 30L), ChatType.GROUP, null);
 
         List<ChatMember> members = service.getChatMembers(request, chat);
 

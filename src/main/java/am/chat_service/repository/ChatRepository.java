@@ -13,6 +13,8 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     Optional<Chat> findById(Long id);
 
+    Optional<Chat> findByOrderId(Long orderId);
+
     @Query(value = "SELECT cm.chat FROM ChatMember cm"
             + " WHERE cm.userId = :userId"
             + " AND cm.chat.chatStatus <> am.chat_service.model.enums.ChatStatus.ARCHIVED"

@@ -32,6 +32,9 @@ public class Chat {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
+    @Column(name = "order_id", unique = true)
+    private Long orderId;
+
     private LocalDateTime createdDateTime;
 
     private LocalDateTime lastActivity;

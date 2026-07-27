@@ -23,6 +23,7 @@ import am.chat_service.repository.ChatRepository;
 import am.chat_service.service.ChatMemberService;
 import am.chat_service.service.ChatService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -34,10 +35,12 @@ import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
 
@@ -54,6 +57,16 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public ChatDetailDto createChatFromExternal(CreateChatRequest request) {
         validateUsers(request.userIds());
+
+        if (request.orderId() != null) {
+            Optional<Chat> existing = chatRepository.findByOrderId(request.orderId());
+            if (existing.isPresent()) {
+                log.info("Chat {} already exists for order {}, returning it instead of creating a duplicate",
+                        existing.get().getId(), request.orderId());
+                return describe(existing.get(), "Chat already exists for this order");
+            }
+        }
+
         ChatType type = resolveChatType(request);
         Chat chat = createChatEntity(request, type);
         Chat savedChat = chatRepository.save(chat);
@@ -64,11 +77,14 @@ public class ChatServiceImpl implements ChatService {
 
         publishEvents(savedChat, request.userIds(), type, savedMsg);
 
-        return chatMapper.toDto(savedChat)
-                .toBuilder()
+        return describe(savedChat, "Chat created successfully");
+    }
 
+    private ChatDetailDto describe(Chat chat, String message) {
+        return chatMapper.toDto(chat)
+                .toBuilder()
                 .status("SUCCESS")
-                .message("Chat created successfully")
+                .message(message)
                 .timestamp(LocalDateTime.now())
                 .build();
     }
@@ -159,6 +175,7 @@ public class ChatServiceImpl implements ChatService {
 
     private Chat createChatEntity(CreateChatRequest request, ChatType type) {
         Chat chat = new Chat();
+        chat.setOrderId(request.orderId());
         chat.setCreatedDateTime(LocalDateTime.now());
         chat.setLastActivity(LocalDateTime.now());
         chat.setChatType(type);

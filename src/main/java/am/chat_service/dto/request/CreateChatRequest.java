@@ -27,6 +27,14 @@ public record CreateChatRequest(
                 example = "PRIVATE"
         )
         @NotNull(message = "Chat type is required")
-        ChatType chatType
+        ChatType chatType,
+
+        @Schema(
+                description = "Order this chat belongs to. When present the endpoint is "
+                        + "idempotent: repeating the call returns the existing chat instead "
+                        + "of creating a duplicate.",
+                example = "42"
+        )
+        Long orderId
 ) {
 }

@@ -7,6 +7,7 @@
     <include file="db/changelog/001-create-chat-table.xml"/>
     <include file="db/changelog/002-create-chat-member-table.xml"/>
     <include file="db/changelog/003-create-chat-message-table.xml"/>
+    <include file="db/changelog/004-add-chat-order-id.xml"/>
 
 </databaseChangeLog>
 

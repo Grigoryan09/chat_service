@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="add-chat-order-id" author="Grisha Grigoryan">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <columnExists tableName="chat" columnName="order_id" schemaName="chat_service"/>
+            </not>
+        </preConditions>
+
+        <addColumn tableName="chat" schemaName="chat_service">
+            <column name="order_id" type="int8">
+                <constraints nullable="true"/>
+            </column>
+        </addColumn>
+    </changeSet>
+
+    <changeSet id="add-chat-order-id-unique-index" author="Grisha Grigoryan">
+        <preConditions onFail="MARK_RAN">
+            <not>
+                <indexExists indexName="ux_chat_order_id" schemaName="chat_service"/>
+            </not>
+        </preConditions>
+
+        <createIndex tableName="chat"
+                     schemaName="chat_service"
+                     indexName="ux_chat_order_id"
+                     unique="true">
+            <column name="order_id"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="chat" schemaName="chat_service" indexName="ux_chat_order_id"/>
+        </rollback>
+    </changeSet>
+</databaseChangeLog>

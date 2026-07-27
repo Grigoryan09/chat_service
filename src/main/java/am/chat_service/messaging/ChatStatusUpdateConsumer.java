@@ -24,11 +24,37 @@ public class ChatStatusUpdateConsumer {
     public void onChatStatusUpdate(ChatStatusUpdateEvent event) {
         log.info("Received chat status update for chat {}: {}", event.chatId(), event.status());
 
-        ChatStatus status = ChatStatus.valueOf(event.status());
-        chatService.changeChatStatus(new ChangeChatStatusRequest(event.chatId(), status));
+        if (event.chatId() <= 0) {
+            log.error("Ignoring chat status update with invalid chatId={}. The producing service "
+                            + "failed to attach a chat to its order; the order document chain "
+                            + "cannot start for this event.",
+                    event.chatId());
+            return;
+        }
+
+        ChatStatus status = resolveStatus(event.status());
+        if (status == null) {
+            return;
+        }
+
+        try {
+            chatService.changeChatStatus(new ChangeChatStatusRequest(event.chatId(), status));
+        } catch (Exception e) {
+            log.error("Failed to change status of chat {} to {}", event.chatId(), status, e);
+        }
 
         if (status == ChatStatus.COMPLETED) {
             chatKafkaProducer.sendOrderDocumentRequest(new OrderDocumentRequestEvent(event.chatId()));
+            log.info("Requested order document generation for chat {}", event.chatId());
+        }
+    }
+
+    private ChatStatus resolveStatus(String status) {
+        try {
+            return ChatStatus.valueOf(status);
+        } catch (IllegalArgumentException | NullPointerException e) {
+            log.error("Unknown chat status '{}' received, ignoring event", status);
+            return null;
         }
     }
 }

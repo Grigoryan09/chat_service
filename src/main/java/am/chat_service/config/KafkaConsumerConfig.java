@@ -4,6 +4,8 @@ import am.chat_service.messaging.event.ChatDocumentMessageEvent;
 import am.chat_service.messaging.event.ChatStatusUpdateEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,7 +13,10 @@ import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.listener.CommonErrorHandler;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -19,6 +24,8 @@ import java.util.Map;
 @Configuration
 @EnableKafka
 public class KafkaConsumerConfig {
+
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaConsumerConfig.class);
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
@@ -43,16 +50,30 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public CommonErrorHandler chatConsumerErrorHandler() {
+        DefaultErrorHandler handler = new DefaultErrorHandler(
+                (record, exception) -> LOG.error(
+                        "Dropping unprocessable record from topic {} partition {} offset {} after retries",
+                        record.topic(), record.partition(), record.offset(), exception),
+                new FixedBackOff(2000L, 3L)
+        );
+        handler.setAckAfterHandle(true);
+        return handler;
+    }
+
+    @Bean
     public ConsumerFactory<String, ChatStatusUpdateEvent> chatStatusConsumerFactory() {
         return new DefaultKafkaConsumerFactory<>(baseConfig(ChatStatusUpdateEvent.class));
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, ChatStatusUpdateEvent> chatStatusKafkaListenerContainerFactory(
-            ConsumerFactory<String, ChatStatusUpdateEvent> chatStatusConsumerFactory) {
+            ConsumerFactory<String, ChatStatusUpdateEvent> chatStatusConsumerFactory,
+            CommonErrorHandler chatConsumerErrorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, ChatStatusUpdateEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(chatStatusConsumerFactory);
+        factory.setCommonErrorHandler(chatConsumerErrorHandler);
         return factory;
     }
 
@@ -63,10 +84,12 @@ public class KafkaConsumerConfig {
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, ChatDocumentMessageEvent> chatDocumentKafkaListenerContainerFactory(
-            ConsumerFactory<String, ChatDocumentMessageEvent> chatDocumentConsumerFactory) {
+            ConsumerFactory<String, ChatDocumentMessageEvent> chatDocumentConsumerFactory,
+            CommonErrorHandler chatConsumerErrorHandler) {
         ConcurrentKafkaListenerContainerFactory<String, ChatDocumentMessageEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(chatDocumentConsumerFactory);
+        factory.setCommonErrorHandler(chatConsumerErrorHandler);
         return factory;
     }
 }
