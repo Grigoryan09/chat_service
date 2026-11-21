@@ -42,6 +42,15 @@ public class ChatEventPublisher {
         ));
     }
 
+    public void publishChatStatusChanged(Long chatId) {
+        eventPublisher.publishEvent(new ChatEvent(
+                this,
+                EventType.CHAT_STATUS_CHANGED,
+                chatId,
+                Map.of("chatId", chatId)
+        ));
+    }
+
     public void publishChatArchived(Long chatId) {
         eventPublisher.publishEvent(new ChatEvent(
                 this,

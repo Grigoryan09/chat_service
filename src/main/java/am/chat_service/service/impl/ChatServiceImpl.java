@@ -1,5 +1,6 @@
 package am.chat_service.service.impl;
 
+import am.chat_service.cache.UserChatsCacheService;
 import am.chat_service.dto.ChatDetailDto;
 import am.chat_service.dto.ChatMessageDto;
 import am.chat_service.dto.ChatSummaryDto;
@@ -25,18 +26,13 @@ import am.chat_service.service.ChatService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 
 @Service
@@ -51,7 +47,19 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMapper chatMapper;
     private final ChatMemberMapper chatMemberMapper;
     private final ChatMemberService chatMemberService;
+    private final UserChatsCacheService userChatsCacheService;
 
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        ChatServiceImpl that = (ChatServiceImpl) o;
+        return Objects.equals(chatRepository, that.chatRepository) && Objects.equals(chatMessageRepository, that.chatMessageRepository) && Objects.equals(chatEventPublisher, that.chatEventPublisher) && Objects.equals(chatMessageMapper, that.chatMessageMapper) && Objects.equals(chatMapper, that.chatMapper) && Objects.equals(chatMemberMapper, that.chatMemberMapper) && Objects.equals(chatMemberService, that.chatMemberService);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(chatRepository, chatMessageRepository, chatEventPublisher, chatMessageMapper, chatMapper, chatMemberMapper, chatMemberService);
+    }
 
     @Override
     @Transactional
@@ -73,6 +81,9 @@ public class ChatServiceImpl implements ChatService {
 
         ChatMessage firstMessage = createFirstMessage(savedChat);
         ChatMessage savedFirstMessage = chatMessageRepository.save(firstMessage);
+        savedChat.setLastActivity(savedFirstMessage.getCreatedDate());
+        chatRepository.save(savedChat);
+
         ChatMessageDto savedMsg = chatMessageMapper.toDto(savedFirstMessage);
 
         publishEvents(savedChat, request.userIds(), type, savedMsg);
@@ -90,13 +101,15 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public void changeChatStatus(ChangeChatStatusRequest updateChatStatusRequest) {
-        Chat chat = chatRepository.findById(updateChatStatusRequest.chatId())
-                .orElseThrow(() -> new ChatNotFoundException("Chat with id %d not found".formatted(updateChatStatusRequest.chatId())
+    @Transactional
+    public void changeChatStatus(ChangeChatStatusRequest request) {
+        Chat chat = chatRepository.findById(request.chatId())
+                .orElseThrow(() -> new ChatNotFoundException(
+                        "Chat with id %d not found".formatted(request.chatId())
                 ));
-
-        chat.setChatStatus(updateChatStatusRequest.chatStatus());
+        chat.setChatStatus(request.chatStatus());
         chatRepository.save(chat);
+        chatEventPublisher.publishChatStatusChanged(chat.getId());
     }
 
     @Override
@@ -105,6 +118,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new ChatNotFoundException("Chat with id %d not found".formatted(chatId)
                 )));
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -130,12 +144,23 @@ public class ChatServiceImpl implements ChatService {
                 .build();
     }
 
+    private static final int CACHE_PAGE_SIZE = 10;
+
     @Override
     @Transactional(readOnly = true)
     public UserChatsDto getUserChats(Long userId, Pageable pageable) {
-        Page<ChatSummaryDto> chats = chatRepository.findChatsByUserId(userId, pageable)
-                .map(chatMapper::toSummary);
-        return new UserChatsDto(chats);
+        if (!isCacheable(pageable)) {
+            return loadUserChats(userId, pageable);
+        }
+        return userChatsCacheService.get(userId)
+                .map(cached -> new UserChatsDto(
+                        new PageImpl<>(
+                                cached.chats(),
+                                pageable,
+                                cached.totalElements()
+                        )
+                ))
+                .orElseGet(() -> loadUserChats(userId, pageable));
     }
 
     @Override
@@ -150,6 +175,26 @@ public class ChatServiceImpl implements ChatService {
         chatRepository.save(chat);
 
         chatEventPublisher.publishChatArchived(chatId);
+    }
+
+    private boolean isCacheable(Pageable pageable) {
+        return pageable.isPaged()
+                && pageable.getPageNumber() == 0
+                && pageable.getPageSize() == CACHE_PAGE_SIZE;
+    }
+
+    private UserChatsDto loadUserChats(Long userId, Pageable pageable) {
+        Page<ChatSummaryDto> chats = chatRepository
+                .findChatsByUserId(userId, pageable)
+                .map(chatMapper::toSummary);
+        if (isCacheable(pageable)) {
+            userChatsCacheService.put(
+                    userId,
+                    chats.getContent(),
+                    chats.getTotalElements()
+            );
+        }
+        return new UserChatsDto(chats);
     }
 
     private void validateUsers(List<Long> userIds) {

@@ -15,12 +15,33 @@ public interface ChatRepository extends JpaRepository<Chat, Long> {
 
     Optional<Chat> findByOrderId(Long orderId);
 
-    @Query(value = "SELECT cm.chat FROM ChatMember cm"
-            + " WHERE cm.userId = :userId"
-            + " AND cm.chat.chatStatus <> am.chat_service.model.enums.ChatStatus.ARCHIVED"
-            + " ORDER BY cm.chat.lastActivity DESC",
-            countQuery = "SELECT count(cm) FROM ChatMember cm"
-                    + " WHERE cm.userId = :userId"
-                    + " AND cm.chat.chatStatus <> am.chat_service.model.enums.ChatStatus.ARCHIVED")
-    Page<Chat> findChatsByUserId(@Param("userId") Long userId, Pageable pageable);
+    @Query(
+            value = """
+            SELECT c
+            FROM Chat c
+            WHERE c.chatStatus <> am.chat_service.model.enums.ChatStatus.ARCHIVED
+              AND EXISTS (
+                  SELECT 1
+                  FROM ChatMember cm
+                  WHERE cm.chat = c
+                    AND cm.userId = :userId
+              )
+            ORDER BY c.lastActivity DESC, c.id DESC
+            """,
+            countQuery = """
+            SELECT COUNT(c)
+            FROM Chat c
+            WHERE c.chatStatus <> am.chat_service.model.enums.ChatStatus.ARCHIVED
+              AND EXISTS (
+                  SELECT 1
+                  FROM ChatMember cm
+                  WHERE cm.chat = c
+                    AND cm.userId = :userId
+              )
+            """
+    )
+    Page<Chat> findChatsByUserId(
+            @Param("userId") Long userId,
+            Pageable pageable
+    );
 }

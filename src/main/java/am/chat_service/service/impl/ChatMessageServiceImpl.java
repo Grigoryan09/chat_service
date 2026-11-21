@@ -54,14 +54,11 @@ public class ChatMessageServiceImpl implements ChatMessageService {
 
         validateMemberBelongsToChat(member, chat);
 
-        chat.setLastActivity(LocalDateTime.now());
-        chatRepository.save(chat);
-
         ChatMessage chatMessage = createMessage(request, chat, member);
-        ChatMessageDto messageDto = chatMessageMapper.toDto(
-                chatMessageRepository.save(chatMessage)
-        );
-
+        ChatMessage savedMessage = chatMessageRepository.save(chatMessage);
+        chat.setLastActivity(savedMessage.getCreatedDate());
+        chatRepository.save(chat);
+        ChatMessageDto messageDto = chatMessageMapper.toDto(savedMessage);
         chatEventPublisher.publishNewMessage(request.getChatId(), messageDto);
 
         return messageDto;
@@ -143,11 +140,21 @@ public class ChatMessageServiceImpl implements ChatMessageService {
     public void deleteChatMessage(long messageId) {
         ChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new ChatMessageNotFoundException(
-                        "Chat message not found with id: " + messageId));
+                        "Chat message not found with id: " + messageId
+                ));
+        Chat chat = message.getChat();
+        Long chatId = chat.getId();
 
-        Long chatId = message.getChat().getId();
         chatMessageRepository.delete(message);
+        chatMessageRepository.flush();
 
+        LocalDateTime lastActivity = chatMessageRepository
+                .findFirstByChat_IdOrderByCreatedDateDesc(chatId)
+                .map(ChatMessage::getCreatedDate)
+                .orElse(chat.getCreatedDateTime());
+
+        chat.setLastActivity(lastActivity);
+        chatRepository.save(chat);
         chatEventPublisher.publishMessageDeleted(chatId, messageId);
     }
 

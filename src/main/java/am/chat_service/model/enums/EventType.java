@@ -8,7 +8,8 @@ public enum EventType {
     USER_LEFT("user_left"),
     MESSAGE_UPDATED("message_updated"),
     MESSAGE_DELETED("message_deleted"),
-    CHAT_ARCHIVED("chat_archived");
+    CHAT_ARCHIVED("chat_archived"),
+    CHAT_STATUS_CHANGED("chat_status_changed");
 
     private final String value;
 

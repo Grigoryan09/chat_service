@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
 
@@ -33,6 +34,10 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<Long> markMessagesAsReadAndReturnIds(Long chatId, Long userId, String status);
 
     Page<ChatMessage> findByChatId(long chatId, Pageable pageable);
+
+    Optional<ChatMessage> findFirstByChat_IdOrderByCreatedDateDesc(
+            Long chatId
+    );
 }
 
 
